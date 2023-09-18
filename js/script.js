@@ -5,7 +5,12 @@ const Routes = {
       type: '',
       term: '',
       page: 1,
-      totalPages: 1
+      totalPages: 1,
+      totalResults: 0
+    },
+    api: { 
+      url: 'https://api.themoviedb.org/3/',
+      key: '6ca2bb5ae3c7254754732b96203b82ef' 
     }
 };
 
@@ -16,6 +21,111 @@ async function search(){
   Routes.search.type = urlParams.get('type'); 
   Routes.search.term = urlParams.get('search-term'); 
 
+  if(Routes.search.term !== '' && Routes.search.term !== null){
+    // do some search
+    const {results, total_pages, total_results, page }= await searchApiCall(); 
+    
+    Routes.search.page = page
+    Routes.search.totalPages = total_pages
+    Routes.search.totalResults = total_results
+
+
+
+
+
+    if(results.length === 0){ 
+      showAlert('No results Found', 'error')
+      return; 
+      
+    }
+    
+    
+    displaySearchResults(results); 
+
+    document.querySelector('#search-term').value = ''
+
+
+  }else{
+    showAlert('Please enter a search term', 'error')
+  }
+
+}
+
+function displaySearchResults(results){
+  // Clear Previous results 
+  document.querySelector('#search-results').innerHTML = ''
+  document.querySelector('#search-results-heading').innerHTML = ''
+  document.querySelector('#pagination').innerHTML = ''
+
+  results.forEach((result) => {
+    const div = document.createElement('div');
+    div.classList.add('card');
+    div.innerHTML = `
+          <a href="${Routes.search.type}-details.html?id=${result.id}">
+            ${
+              result.poster_path
+                ? `<img
+              src="https://image.tmdb.org/t/p/w500${result.poster_path}"
+              class="card-img-top"
+              alt="${Routes.search.type === 'movie' ? result.title : result.name}"
+            />`
+                : `<img
+            src="../images/no-image.jpg"
+            class="card-img-top"
+            alt="${Routes.search.type === 'movie' ? result.title : result.name}"
+          />`
+            }
+          </a>
+          <div class="card-body">
+            <h5 class="card-title">${Routes.search.type === 'movie' ? result.title : result.name}</h5>
+            <p class="card-text">
+              <small class="text-muted">Release: ${Routes.search.type === 'movie' ? result.release_date : result.first_air_date}</small>
+            </p>
+          </div>
+        `;
+    
+        document.querySelector('#search-results-heading').innerHTML = `
+            <h2>${results.length} of ${Routes.search.totalResults} Results for ${Routes.search.term}</h2> 
+        `      
+      document.querySelector('#search-results').appendChild(div);
+  });
+
+  displayPagination()
+}
+
+function displayPagination(){
+  const div = document.createElement('div')
+  div.classList.add('pagination')
+  div.innerHTML = `
+ 
+    <button class="btn btn-primary" id="prev">Prev</button>
+    <button class="btn btn-primary" id="next">Next</button>
+    <div class="page-counter">Page ${Routes.search.page} of ${Routes.search.totalPages}</div>
+  `
+  document.querySelector('#pagination').appendChild(div)
+
+  // disable prev button if its the first page 
+  if(Routes.search.page === 1){
+  document.querySelector('#prev').disabled = true
+
+  }
+
+  if(Routes.search.page === Routes.search.totalPages){
+  document.querySelector('#next').disabled = true
+    
+  }
+
+  document.querySelector('#next').addEventListener('click', async () => { 
+    Routes.search.page++
+    const {results, total_pages} = await searchApiCall(); 
+    displaySearchResults(results)
+  })
+
+  document.querySelector('#prev').addEventListener('click', async () => { 
+    Routes.search.page--
+    const {results, total_pages} = await searchApiCall(); 
+    displaySearchResults(results)
+  })
 }
 
 // Show Show details 
@@ -200,6 +310,16 @@ function displayBackgroundImage (type, path){
 
 }
 
+// Create alert 
+function showAlert (type, className){
+  const div = document.createElement('div');
+  div.classList.add('alert', className);
+  // div.appendChild(document.createTextNode(type))
+  div.innerHTML = type
+  document.querySelector('#alert').appendChild(div)
+
+  setTimeout(() => div.remove() , 2000)
+}
 
 function numberFormat (number){
     if(number) return number.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,");
@@ -374,8 +494,8 @@ function initSwiper() {
 
 //API call 
 async function apiCall (endpoint){ 
-    const API = '6ca2bb5ae3c7254754732b96203b82ef'
-    const URL = 'https://api.themoviedb.org/3/'
+    const API = Routes.api.key
+    const URL = Routes.api.url
 
     showSpinner()
    
@@ -387,6 +507,23 @@ async function apiCall (endpoint){
     hideSpinner()
 
     return data
+}
+
+//SearchAPI call 
+async function searchApiCall (endpoint){ 
+  const API = Routes.api.key
+  const URL = Routes.api.url
+
+  showSpinner()
+ 
+  const API_URL = `${URL}search/${Routes.search.type}?api_key=${API}&language=en-US&query=${Routes.search.term}&page=${Routes.search.page}`
+  
+  const response = await fetch(API_URL); 
+  const data = await response.json()
+  
+  hideSpinner()
+
+  return data
 }
 
 // Hightlight menu 
